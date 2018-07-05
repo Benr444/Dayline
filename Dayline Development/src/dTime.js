@@ -1,10 +1,11 @@
 function dTime(constructorInput)
 {
 	//-----------------------PRIVATE CONSTANTS AND PROPERTIES-----------------------
-	var minutes = 0;
-	var hours = 0;
-	var trueHours = 0;
-	var meridian = "";
+	var minutes = 0;                    //Minute value
+	var totalMinutes = 0;               //# of minutes since midnight
+	var hours = 0;                      //12-hour clock hour-value
+	var trueHours = 0;                  //24-hour clock hour-value
+	var meridian = "";                  //AM or PM
 	
 	//-----------------------PUBLIC FUNCTIONS-----------------------
 	//--- Sets minutes, hours, trueHours, and meridian values in one fell swoop, with special inputs. Takes Dates, strings, numbers, and other dTimes ---
@@ -52,16 +53,7 @@ function dTime(constructorInput)
 				}
 			break;
 			case "number":
-				if (input > (24 * 60))                                          //If the input exceeds the maximum number of minutes in a day
-				{
-					input = (24 * 60);                                          //Cap at the maximum minutes in a day
-				}
-				var initialMinutes = Math.trunc(input % 60);                    //Minute value is assigned to the reminder of the hour division. Truncated to create integer
-				var initialTrueHours = Math.trunc(input / 60);                  //TrueHour value is the number of 60-minute segments passed. Trucated to create integers
-				var initialMeridian = (trueHours < 12) ? "AM" : "PM";           //If there are less than 12 trueHours, then it is an AM time. Reminder: 12 hours = PM, since noon is 12PM
-				this.setMinutes(initialMinutes);                                //Uses inbuilt scrubbing to assign
-				this.setTrueHours(initialTrueHours);                            //Uses inbuilt scrubbing to assign
-				this.setMeridian(initialMeridian);                              //Uses inbuilt scrubbing to assign
+				this.setTotalMinutes(input)
 			break;
 			case "object":
 				if (input instanceof this)
@@ -87,15 +79,38 @@ function dTime(constructorInput)
 	//--- Sets the minute value to a number between 0-59 ---
 	this.setMinutes = function(minuteNumber)
 	{
-		if (minuteNumber > 59) {minuteNumber = 59;} //Maximum constraint
-		if (minuteNumber < 0) {minuteNumber = 0;}   //Minimum constraint
+		if (minuteNumber > 59) {minuteNumber = 59;}            //Maximum constraint
+		if (minuteNumber < 0) {minuteNumber = 0;}              //Minimum constraint
 		minutes = minuteNumber;
+		this.setTotalMinutes((trueHours * 60) + minuteNumber); //Update the total minutes
 	}
 	
 	//--- Returns the minute value (number) ---
 	this.getMinutes = function()
 	{
 		return minutes;
+	}
+	
+	//--- Sets the total minutes since midnight value to a number between 1440 ---
+	this.setTotalMinutes(totalMinuteNumber)
+	{
+		if (totalMinuteNumber > (24 * 60))                              //If the input exceeds the maximum number of minutes in a day
+		{
+			totalMinuteNumber = (24 * 60);                              //Cap at the maximum minutes in a day
+		}
+		totalMinutes = totalMinuteNumber;                               //Assignment
+		var initialMinutes = Math.trunc(totalMinuteNumber % 60);        //Minute value is assigned to the reminder of the hour division. Truncated to create integer
+		var initialTrueHours = Math.trunc(totalMinuteNumber / 60);      //TrueHour value is the number of 60-minute segments passed. Trucated to create integers
+		var initialMeridian = (trueHours < 12) ? "AM" : "PM";           //If there are less than 12 trueHours, then it is an AM time. Reminder: 12 hours = PM, since noon is 12PM
+		this.setMinutes(initialMinutes);                                //Uses inbuilt scrubbing to assign
+		this.setTrueHours(initialTrueHours);                            //Uses inbuilt scrubbing to assign
+		this.setMeridian(initialMeridian);                              //Uses inbuilt scrubbing to assign
+	}
+	
+	//--- Returns the total minutes since midnight value (number) ---
+	this.getTotalMinutes = function()
+	{
+		return totalMinutes;
 	}
 	
 	//--- Sets the 12-hour clock hour value to a number (between 1-12) irrespective of meridian ---
