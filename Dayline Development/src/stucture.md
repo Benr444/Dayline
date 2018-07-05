@@ -12,20 +12,20 @@ Similar to a date, but specifies a time only on a 12 or 24 hour clock, down to m
 
 - setMinutes(number)
 
-    - `The number will be edited to be within proper values (without warning)`
+    - `The number will be edited to be within proper values (0-59) (without warning)`
 
 - getMinutes()
 
 - setHours(number)
 
     - `Set the 12-hour clock hours. This updates the true (24h) hours as well`
-    - `The number will be edited to be within proper values (without warning)`
+    - `The number will be edited to be within proper values (1-12) (without warning)`
 
 - getHours()
 
 - setTrueHours(number)
 
-    - `The number will be edited to be within proper values (without warning)`
+    - `The number will be edited to be within proper values (0-23) (without warning)`
 
 - getTrueHours()
 
@@ -43,15 +43,19 @@ Similar to a date, but specifies a time only on a 12 or 24 hour clock, down to m
 
     - `The setTime function is identical to the constructor`
     - `"input": This can be one of the following`
-        `1. A timestring formatted like this: "11:47PM"`
-        `2. A javascript Date object whose hour and minute values will be extracted`
-        `3. A number of minutes past midnight which will be translated into a readable time`
-        `4. A dTime object`
+        `1. A timestring formatted like this: "11:47PM" for 12h clocks`
+        `2. A timestring formatted like this: "22:47" for 24h clocks`
+        `3. A javascript Date object whose hour and minute values will be extracted`
+        `4. A number of minutes past midnight which will be translated into a readable time`
+        `5. A dTime object`
 
 - getTime()
 
-    - `Returns a readable time string like "3:25PM"`
+    - `Returns a readable time string like "3:25PM" for 12h clocks`
 
+- getTrueTime()
+   
+    - `Returns a readable time string like "14:32" for 24h clocks`
 
 ## Subclass: Frame
 A frame represents an event, booking, or appointment on the Dayline.
