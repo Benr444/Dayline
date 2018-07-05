@@ -9,6 +9,65 @@ Other Concepts:
 2. Selector - This is a vertical bar that appears on the Timeline to represent a selected time
 3. Events - Use addEventListener(string) to add a function to trigger on a number of possible events. Your complete hooking and customization system. Complete list of events available under "Dayline Public Properties"
 
+## Public Dayline Properties
+
+- dTime(...)
+
+    - 	`Constructor for the dTime subclass`
+    
+- getDisplay()
+
+    - `Returns an HTML structure that serves as the GUI for the dayline`
+    
+- addFrame(start)
+
+    - `The paramters for this function are the same as the dFrame constructor above, without identifier`
+    
+- setSelectorTime(input)
+
+    - `Puts the selector at the time specified by the input`
+    - `The second input must be a valid input for the dTime constructor`
+
+- getSelectorTime()
+
+    - `Returns a dTime object that contains the time-position of the selector`
+
+- **addEventListener(string, function)**
+
+    - `Serves as the complete hooking system`
+    - `The string determines what event is being listened to. Possible values are:`
+    
+        `1. addFrame        - dFrame added to internal register`
+        
+        `2. removeFrame     - dFrame removed from internal register`
+        
+        `3. hideFrame       - dFrame removed from Timeline`
+        
+        `4. showFrame       - dFrame added to Timeline`
+        
+        `5. inspectFrame    - dFrame HTML inspected/expanded`
+        
+        `6. frameChange     - dFrame data changed`
+        
+        `7. frameConflict   - dFrame violates a Dayline rule`
+        
+        `8. selectorChange  - Timeline selector changes position or initialized`
+        
+    - `The passed function is executed when the event happens (psst, this how ALL event listening schemes work)`
+
+## *Class-Level and/or Private Dayline Properties*
+
+These are here to help explain some underlying structure. They are not accessible outside the source code of the Dayline class
+
+- *triggerEvent(string)*
+
+     - `Triggers the event linked the passed string. See addEventListener function for guide`
+
+- *increaseInstance()*
+
+    - `Calling this function returns a number unique to this Dayline instance on this webpage`
+    - `Ensures that multiple Dayline functions don't interfere on a page`
+
 ## Subclass: dTime
 Similar to a date, but specifies a time only on a 12 or 24 hour clock, down to minute
 
@@ -136,53 +195,3 @@ Note: dFrames can't be instantiated normally. Normally, only the main Dayline cl
 
     - `Returns a string that represents the category this dFrame belongs in` 
     - `Categories are determined by the Dayline this dFrame belongs to`
-
-## Public Dayline Properties
-
-- dTime(...)
-
-    - 	`Constructor for the dTime subclass`
-    
-- getDisplay()
-
-    - `Returns an HTML structure that serves as the GUI for the dayline`
-    
-- addFrame(start)
-
-    - `The paramters for this function are the same as the dFrame constructor above, without identifier`
-    
-- setSelectorTime(input)
-
-    - `Puts the selector at the time specified by the input`
-    - `The second input must be a valid input for the dTime constructor`
-
-- getSelectorTime()
-
-    - `Returns a dTime object that contains the time-position of the selector`
-
-- **addEventListener(string, function)**
-
-    - `Serves as the complete hooking system`
-    - `The string determines what event is being listened to. Possible values are:`
-        `1. addFrame        - dFrame added to internal register`
-        `2. removeFrame     - dFrame removed from internal register`
-        `3. hideFrame       - dFrame removed from Timeline`
-        `4. showFrame       - dFrame added to Timeline`
-        `5. inspectFrame    - dFrame HTML inspected/expanded`
-        `6. frameChange     - dFrame data changed`
-        `7. frameConflict   - dFrame violates a Dayline rule`
-        `8. selectorChange  - Timeline selector changes position or initialized`
-    - `The passed function is executed when the event happens (psst, this how ALL event listening schemes work)`
-
-## *Class-Level and/or Private Dayline Properties*
-
-These are here to help explain some underlying structure. They are not accessible outside the source code of the Dayline class
-
-- *triggerEvent(string)*
-
-     - `Triggers the event linked the passed string`
-
-- *increaseInstance()*
-
-    - `Calling this function returns a number unique to this Dayline instance on this webpage`
-    - `Ensures that multiple Dayline functions don't interfere on a page`
