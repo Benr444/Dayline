@@ -11,6 +11,11 @@ Other Concepts:
 
 ## Public Dayline Properties
 
+- Constructor(boolean)
+
+    - `Creates a dayline.`
+    - `Parameter: "allowConflicts" - determines if dFrames sharing a category and some time period are allowed to overlap`
+
 - dTime(...)
 
     - 	`Constructor for the dTime subclass`
@@ -19,7 +24,7 @@ Other Concepts:
 
     - `Returns an HTML structure that serves as the GUI for the dayline`
     
-- addFrame(start)
+- addFrame(...)
 
     - `The paramters for this function are the same as the dFrame constructor above, without identifier`
     
@@ -27,10 +32,21 @@ Other Concepts:
 
     - `Puts the selector at the time specified by the input`
     - `The second input must be a valid input for the dTime constructor`
+    - `The timeline will scroll until the selector is in view`
 
 - getSelectorTime()
 
     - `Returns a dTime object that contains the time-position of the selector`
+    
+- setScroll(input)
+
+    - `Sets the scroll position in terms of a dTime construction input`
+    - `The passed time is centered at the new position`
+
+- getScroll()
+
+    - `Returns the time-value at the center of the current scroll position`
+    - `A dTime object is returned`
 
 - **addEventListener(string, function)**
 
@@ -67,6 +83,10 @@ These are here to help explain some underlying structure. They are not accessibl
 
     - `Calling this function returns a number unique to this Dayline instance on this webpage`
     - `Ensures that multiple Dayline functions don't interfere on a page`
+    
+- *updateDisplay()*
+
+    - `Updates the visual display of the Dayline for recent changes`
 
 ## Subclass: dTime
 Similar to a date, but specifies a time only on a 12 or 24 hour clock, down to minute
@@ -141,11 +161,27 @@ Note: dFrames can't be instantiated normally. Normally, only the main Dayline cl
 
 **Public Properties**
 
-- Constructor(startInput, endInput, title, description, identifier)
+- Constructor(startInput, endInput, title, description)
 
     - `Creates a dFrame with the bare minimum of properties for display`
     - `startInput and endInput must be valid values for the setTime(input) function of the dTime class`
+    
+- getDisplay()
 
+    - `Returns the HTML element for this dFrame`
+    
+- setSpacing(number)
+
+    - `Sets the spacing (pixels between 15 minute segments)`
+    - `Helps the dFrames resize and display`
+    
+- setPopState(boolean)
+    - `Allows setting the dFrame to display its data or not`
+    - `TRUE -> Displayed, FALSE -> Hidden`
+    
+- getPopState()
+    - `Returns the state of the pop info`
+        
 - setStartTime(input)
 
     - `Setting the start time will change the frame on the GUI`
@@ -155,7 +191,7 @@ Note: dFrames can't be instantiated normally. Normally, only the main Dayline cl
 
 - getStartTime()
 
-    - 	`Returns a dTime object representing the starting time for this frame`
+    - `Returns a dTime object representing the starting time for this frame`
     - `The object is a COPY, and cannot be used to directly edit time values for this frame`
     
 - setEndTime(input)
@@ -188,7 +224,7 @@ Note: dFrames can't be instantiated normally. Normally, only the main Dayline cl
     
 - getIdentifier()
 
-    - `Each frame inside a Dayline has a unique identifier number that can be used to call it up from the main Dayline object its associateed with`
+    - `Each dFrame on a webpage has a unique number associated with it`
     - `Calling this function returns that number`
 
 - getCategory()

@@ -2,10 +2,10 @@ function dTime(constructorInput)
 {
 	//-----------------------PRIVATE CONSTANTS AND PROPERTIES-----------------------
 	var minutes = 0;                    //Minute value
-	var totalMinutes = 0;               //# of minutes since midnight
 	var hours = 0;                      //12-hour clock hour-value
 	var trueHours = 0;                  //24-hour clock hour-value
 	var meridian = "";                  //AM or PM
+	var loopStop = false;               //Used to prevent infinite loop calls when uodating values
 	
 	//-----------------------PUBLIC FUNCTIONS-----------------------
 	//--- Sets minutes, hours, trueHours, and meridian values in one fell swoop, with special inputs. Takes Dates, strings, numbers, and other dTimes ---
@@ -38,9 +38,9 @@ function dTime(constructorInput)
 					var hoursStr = input.split(":")[0];                         //12
 					var minutesStr = input.split(":")[1].slice(0, 2);           //0
 					var meridianStr = input.split(":")[1].slice(2, 5);          //"AM"
-					this.setHours(Number(hoursStr));                            //Uses inbuilt scrubbing to assign
 					this.setMinutes(Number(minutesStr));                        //Uses inbuilt scrubbing to assign
 					this.setMeridian(meridianStr);                              //Uses inbuilt scrubbing to assign
+					this.setHours(Number(hoursStr));                            //Uses inbuilt scrubbing to assign. Must be called after setMeridian
 				}
 				else
 				{
@@ -53,7 +53,7 @@ function dTime(constructorInput)
 				}
 			break;
 			case "number":
-				this.setTotalMinutes(input)
+				this.setTotalMinutes(Number(input))
 			break;
 			case "object":
 				if (input instanceof this)
@@ -82,7 +82,6 @@ function dTime(constructorInput)
 		if (minuteNumber > 59) {minuteNumber = 59;}            //Maximum constraint
 		if (minuteNumber < 0) {minuteNumber = 0;}              //Minimum constraint
 		minutes = minuteNumber;
-		this.setTotalMinutes((trueHours * 60) + minuteNumber); //Update the total minutes
 	}
 	
 	//--- Returns the minute value (number) ---
@@ -92,25 +91,28 @@ function dTime(constructorInput)
 	}
 	
 	//--- Sets the total minutes since midnight value to a number between 1440 ---
-	this.setTotalMinutes(totalMinuteNumber)
+	this.setTotalMinutes = function(totalMinuteNumber)
 	{
 		if (totalMinuteNumber > (24 * 60))                              //If the input exceeds the maximum number of minutes in a day
 		{
 			totalMinuteNumber = (24 * 60);                              //Cap at the maximum minutes in a day
 		}
-		totalMinutes = totalMinuteNumber;                               //Assignment
+		else if (totalMinuteNumber < 0)                                 //Minimal cap
+		{
+			totalMinuteNumber = 0;                                      //
+		}
 		var initialMinutes = Math.trunc(totalMinuteNumber % 60);        //Minute value is assigned to the reminder of the hour division. Truncated to create integer
 		var initialTrueHours = Math.trunc(totalMinuteNumber / 60);      //TrueHour value is the number of 60-minute segments passed. Trucated to create integers
-		var initialMeridian = (trueHours < 12) ? "AM" : "PM";           //If there are less than 12 trueHours, then it is an AM time. Reminder: 12 hours = PM, since noon is 12PM
-		this.setMinutes(initialMinutes);                                //Uses inbuilt scrubbing to assign
 		this.setTrueHours(initialTrueHours);                            //Uses inbuilt scrubbing to assign
+		this.setMinutes(initialMinutes);
+		var initialMeridian = (trueHours < 12) ? "AM" : "PM";           //If there are less than 12 trueHours, then it is an AM time. Reminder: 12 hours = PM, since noon is 12PM
 		this.setMeridian(initialMeridian);                              //Uses inbuilt scrubbing to assign
 	}
 	
 	//--- Returns the total minutes since midnight value (number) ---
 	this.getTotalMinutes = function()
 	{
-		return totalMinutes;
+		return ((this.getTrueHours() * 60) + this.getMinutes());
 	}
 	
 	//--- Sets the 12-hour clock hour value to a number (between 1-12) irrespective of meridian ---
@@ -120,7 +122,7 @@ function dTime(constructorInput)
 		if (hourNumber <= 0) {hourNumber = 12;}   //Minimum constraint
 		hours = hourNumber;                       //Assignment
 		//Update trueHours to reflect hours
-		if (meridian == "AM")                     //
+		if (meridian == "AM")                    //
 		{
 			trueHours = hourNumber;               //In AM, trueHours and hours match
 			if (trueHours == 12) {trueHours = 0}; //Except for midnight, which is 12:00AM or 00:00 true
@@ -136,6 +138,7 @@ function dTime(constructorInput)
 				trueHours = hourNumber + 12;      //e.g. 1:00PM -> 13:00
 			}   
 		}
+		totalMinutes = (trueHours * 60) + minutes;
 	}
 	
 	//--- Returns the 12-hour clock hours as a number ---
@@ -161,7 +164,8 @@ function dTime(constructorInput)
 			meridian = "AM";                             //In the morning
 			hours = trueHourNumber;                      //trueHours and hours match
 		}
-		if (hours == 0) {hours = 12};                    //No such thing as 0 o' clock!
+		if (hours == 0) {hours = 12;}                    //No such thing as 0 o' clock!
+		totalMinutes = (trueHours * 60) + minutes;       //
 	}
 	
 	//--- Returns the 24-hour clock hours as a number ---
@@ -192,4 +196,5 @@ function dTime(constructorInput)
 	
 	//-----------------------CONSTRUCTOR CODE-----------------------
 	this.setTime(constructorInput);
+	console.log("dTime: " + this.getTime());
 }
