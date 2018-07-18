@@ -1,702 +1,740 @@
-/*
- * |----- DAYLINE.JS -----|
- * Dayline (Portmanteau of 'Day' and 'Timeline') is a javascript class that handles the display and collision of timeframes (referred to as "frames")
- *     on a simple timeline. To be used in scheduling programs to provide a graphical interface for creating frames and
- *     preventing unwanted frames from happening at the same time. The dayline program focuses on events that happen within the span of a single day
- * Development Start Date: 6/13/2018
- * Author: Benjamin Ranson
- * Example Usage:
- *     var DL = new Dayline();
- *     parent.appendChild(DL.getDisplay());
- *     var frame = new Frame( "12:00AM", "3:36PM", "Title", "Desc");
- *     DL.addFrame(frame, true);
- * 
- * === CSS Class Guide ===
- * - ".dayline-main": Contains the entirety of the dayline system
- *     - ".dayline-timeline": Contains all frames, labels, borders, etc. Larger than dayline itself, the element that is scrolled around
- *         - ".dayline-timelabel": Labels at top of .dayline-timeline that indicate time
- *         - ".dayline-timebar":   Thin border-only elements that extend timelabels down to the bottom of the timeline
- *         - ".dayline-frame":     Boxes that stretch stretch between timebars. Represent frames themselves on the timeline
- *         - ".dayline-framepop":  Boxes that appear when dayline-frames are clicked on. Reveal data about start and stop times
- *         - ".dayline-selector":  Thin border-only element that appears where the user clicks. Used to create new frames
- *  
- * === Z-Index Hierarchy ====
- * All elements are created on the default z-index except the following:
- *     - The first frame added occupies z-index = 1000
- *         - The first frame's framepop occupies z-index = 999
- *     - The second frame added occupies z-index = 998
- *         - The second frame's framepop occupies z-index= 997
- *     - etc, etc for all subsequent frames and framepops
- *     - The selector elements occupy z-index = 10,000
- *     
- * === Scope and Properties Guidelines ===
- * Due to the odd scoping of onClick functions generated within greater JS files, it is important to control scope while at the same time ensuring parent
- *     properties are simple to access within specific contexts. The following guidelines mostly serve as rules for further development
- * # Daylines:
- *     - ID Number of the dayline-main they are associated with  
- * # Dayline-Divs
- *     - 
- * # Dayline-Timelines
- *     - 
- * # Dayline-Timeline-Divs
- *     -
- * # Dayline-Frames:
- *     - 
- * # Dayline-Frame-Divs
- *     - 
- * # Dayline-Framepops:
- *     - 
- * # Dayline-Framepop-Divs
- *     - 
- *     
- *     
- */ 
+function Dayline(allowConflictsInput)
+{
+	//-----------------------PRIVATE CONSTANTS AND PROPERTIES-----------------------
+	var identifier = 0;              //
+	var allowConflicts = true;       //
+	var selectorTime = 0;            //Minutes-since-midnight value for the selector's position
+	const spacing = 150;             //Spacing between minute segments
+	const minuteSegment = 15;        //# of minutes between minute divisions
+	var dFrames = [];                //Array of all frames inside this Dayline
+	var display = null;              //
+	var timelineDisplay = null;      //
+	var selectorDisplay = null;      //
+	var timelabelDisplays = [];      //All timelabels in the Dayline
+	var timebarDisplays = [];        //All timebars in the Dayline
+	var eventListeners = {};          //Contains all arrays which contain all event listening functions. See bottom constructor code or docs for possible hooks
 
-/*
- * Creates and defines a dayline
- *    Param1 = Private variable that determines if events are allowed to happen at the same time
- *    Param2 = Private variable that determins if events are allows to happen at the same time if they have the same category
- */
-function Dayline(allowConflict, allowCategoryConflict)
-{	
-	// --- FIELDS --- //
-	this.dN; //The unique ID number of the div element that contains this Dayline's data
-	var zoom = 0; //Private variable that determines the scale of the timeline
-	this.frames = []; //Array of all frames stored within the timeline
-	var divisions = 4; //Private variable. The number of divisions of an hour. Changed by zoom level
-	this.eventListeners = //Object containing arrays of event listeners for each respective kind of event 
-	{
-		"addFrame": [],
-		"removeFrame": [],
-		"inspectFrame": [],
-		"frameConflict": [],
-		"zoomChange": [],
-		"selectorChange": []
-	};
-	
-	// --- "PROTO" METHODS/FIELDS --- //
-	/*
-	 * Determins the number of pixels between labels
-	 */
-	this.__proto__.getResolution = (function()
-	{
-		var baseResolution = 150; //Immutable.
-		return function() {return baseResolution;}
-	})();
-	
-	/*
-	 * Creates a "private" instanceCount field shared by all dayline elements that ensures that each dayline instance has a unique ID.
-	 */
+	//-----------------------PRIVATE FUNCTIONS-----------------------
+	//--- Private function that ups the identifier number for any possible Dayline ---
 	this.__proto__.increaseInstance = (function()
 	{
 		var instanceCount = -1; //Begins at -1 so that the first instance is 0.
 		return function() {instanceCount += 1; return instanceCount;}
 	})();
 	
-	// --- EVENT-RELATED FUNCTIONS--- //
-	/*
-	 * Allows registry of event listeners
-	 */
-	this.addEventListener = function(eventType, listenerFunc)
+	//-----------------------PUBLIC FUNCTIONS-----------------------
+	//--- Forces html to reflect internal values ---
+	var updateDisplay = function()
 	{
-		switch (String(eventType))
+		//== display update ==
+		display.style.height = "100%";
+		display.style.width = "100%";
+		display.style.display = "flex";           //Centering
+		display.style.flexFlow = "column nowrap"; //Centering
+		display.style.alignItems = "center";      //Centering
+		display.style.justifyContent = "center";  //Centering
+		//== timeline update ==
+		timelineDisplay.style.height = "90%";
+		timelineDisplay.style.width = "90%";
+		timelineDisplay.style.overflow = "auto";
+		timelineDisplay.style.position = "relative";
+		//== selector update ==
+		selectorDisplay.style.position = "absolute";
+		selectorDisplay.style.left = ((selectorTime / minuteSegment) * spacing) + "px";
+		selectorDisplay.style.height = "90%";
+		selectorDisplay.style.width = "0";
+		selectorDisplay.style.top = "10%";
+		//== timelabel update ==
+		for (var g = 0; g < timelabelDisplays.length; g++)
 		{
-			case "addFrame": 
-				this.eventListeners.addFrame.push(listenerFunc);
-			break;
-			case "inspectFrame":
-				this.eventListeners.inspectFrame.push(listenerFunc);
-			break;
-			case "frameConflict":
-				this.eventListeners.frameConflict.push(listenerFunc);
-			break;
-			case "selectorChange":
-				this.eventListeners.selectorChange.push(listenerFunc);
-			break;
+			timelabelDisplays[g].style.display = "flex";           //Centering
+			timelabelDisplays[g].style.flexFlow = "column nowrap"; //Centering
+			timelabelDisplays[g].style.alignItems = "center";      //Centering
+			timelabelDisplays[g].style.justifyContent = "center";  //Centering
+			timelabelDisplays[g].style.position = "absolute";      //Necessary for proper positioning
+			timelabelDisplays[g].style.left = (g * spacing) + "px"
+			timelabelDisplays[g].style.height = "10%";
+			timelabelDisplays[g].style.width = spacing + "px";
+		}
+		//== timebar update ==
+		for (var h = 0; h < timebarDisplays.length; h++)
+		{
+			timebarDisplays[h].style.position = "absolute";         //Necessary for proper positioning
+			var tempTime = new Dayline.DTime(h * minuteSegment);       //The temporary dTime element allows converting minutes to actual time past midnight
+			timebarDisplays[h].innerText = tempTime.getTime();      //
+			timebarDisplays[h].style.left = (h * spacing) + "px"    //
+			timebarDisplays[h].style.height = "100%";
+			timebarDisplays[h].style.width = 0;
+		}
+		//== dFrames updates ==
+		for (var k = 0; k < dFrames.length; k++)
+		{
+			//console.log(JSON.stringify(dFrames[k]));
+			var dFrameDisplay = dFrames[k].getDisplay();          //Temporary variable to specify additional HTML parameters
+			dFrameDisplay.style.top = "10%";                      //Calculate proper displacement from the top of the timeline
+			timelineDisplay.appendChild(dFrameDisplay);           //dFrames are completely redrawn each update
 		}
 	}
 	
-	/*
-	 * Called when an event triggers
-	 *     parameter1 = type of event to be triggered
-	 *     parameter2 = event data object
-	 */
-	this.triggerEvent = function(eventType, e)
+	//---  ---
+	this.getDisplay = function()
 	{
-		var u = 0; //Index variable for event for-loop
-		switch (eventType)
+		if (display == null)
 		{
-			case "addFrame":
-				for (u = 0; u < this.eventListeners.addFrame.length; u++)
-				{
-					try
-					{
-						this.eventListeners.addFrame[u](e); //Call each function stored in the addFrame array
-					}
-					catch(err)
-					{
-						throw err; //If the function cannot handle being called, throw an error
-					}
-				}
-			break;
-			case "inspectFrame":
-				for (u = 0; u < this.eventListeners.inspectFrame.length; u++)
-				{
-					try
-					{
-						this.eventListeners.inspectFrame[u](e); //Call each function stored in the addFrame array
-					}
-					catch(err)
-					{
-						throw err; //If the function cannot handle being called, throw an error
-					}
-				}
-			break;
-			case "frameConflict":
-				for (u = 0; u < this.eventListeners.frameConflict.length; u++)
-				{
-					try
-					{
-						this.eventListeners.frameConflict[u](e); //Call each function stored in the addFrame array
-					}
-					catch(err)
-					{
-						throw err; //If the function cannot handle being called, throw an error
-					}
-				}
-			break;
-			case "selectorChange":
-				for (u = 0; u < this.eventListeners.selectorChange.length; u++)
-				{
-					try
-					{
-						this.eventListeners.selectorChange[u](e); //Call each function stored in the addFrame array
-					}
-					catch(err)
-					{
-						throw err; //If the function cannot handle being called, throw an error
-					}
-				}
-			break;
-		}
-	}
-	
-	// --- "INSTANCE" METHODS --- //
-	/*
-	 * Adds the passed event to the dayline.
-	 *     parameter1 = the frame object
-	 *     parameter2 = boolean. true to display on the dayline, false to hide
-	 * 
-	 * Return
-	 *     true -> if frame is accepted
-	 *     false -> if frame is rejected
-	 */
-	this.addFrame = function(newFrame, display)
-	{
-		var passedCheck = true; //Gets set to true if the event is allowed to be added
-		if (allowConflict == false) //If this dayline does not allow conflicts, we must ensure that there is no event overlap before adding it
-		{
-			var sStart; //Stored event start "value"
-			var sEnd; //Stored event end "value"
-			var nStart = (newFrame.trueStartHours * 60) + (newFrame.startMinutes); //New event start "value"
-			var nEnd = (newFrame.trueEndHours * 60) + (newFrame.endMinutes); //New event end "value"
-			var conflictFrameIndex = null; //If there is a frame conflict, then this will store the conflicting frame's index
-			//console.log("For event " + newFrame.title);
-			//console.log("	nStart: " + nStart);
-			//console.log("	nEnd: " + nEnd);
-			if (this.frames.length == 0) //If there are no already-added frames
+			//== display config == 
+			display = document.createElement("div");
+			display.id = "dayline-n" + identifier;
+			display.classList.add("dayline");
+			//== timelineDisplay config ==
+			timelineDisplay = document.createElement("div");
+			timelineDisplay.id = display.id + "-timeline"
+			timelineDisplay.classList.add("dayline-timeline");
+			timelineDisplay.Dayline = this;                               //Add the Dayline to the timeline so that the onclick function can access Dayline functions
+			timelineDisplay.addEventListener("click", function(e)         
 			{
-				passedCheck = true; //There can be no conflict, thus the frames is valid
-			}
-			else
-			{
-				for (var u in this.frames) //For each previously stored frame
+				if (e.target == this)                                     //Only execute if the timeline was clicked on but NOT a dFrame
 				{
-					//The value is the number of minutes past midnight. Add 960 minutes if the time is PM
-					sStart = (this.frames[u].trueStartHours * 60) + (this.frames[u].startMinutes);
-					sEnd = (this.frames[u].trueEndHours * 60) + (this.frames[u].endMinutes);
-					//console.log("	sStart: " + sStart);
-					//console.log("	sEnd: " + sEnd);
-					//console.log("   nEnd <= sStart: " + (nEnd <= sStart));
-					//console.log("   nStart >= sEnd: " + (nStart >= sEnd));
-					if ((nEnd <= sStart) || (nStart >= sEnd))
-					{
-						//Nothing happens. The frame is considered to be passed until it fails a check
-					}
-					else
-					{
-						passedCheck = false; //As soon as the frame fails one check, it is done for good
-						conflictFrameIndex = u; //The conflicting frame is at this index
-					}
+					
 				}
-			}
-		}
-		else //If this dayline allows conflict, then all frames pass checks
-		{
-			passedCheck = true; //If there's no checks, then it definitely passed
-		}
-		if (passedCheck == true)
-		{
-			this.frames.push(newFrame); //Add the newFrame onto the list of frames
-			var frameIndex = (this.frames.length - 1); //Index of the newly added frame
-			var frameDiv = document.createElement("div"); //Create element that will represent the frame on the timeline
-			frameDiv.dN = this.dN; //Share the dayline number with the frame;
-			frameDiv.innerHTML = newFrame.title; //Set the frame to be labeled as "title"
-			frameDiv.classList.add("dayline-frame");
-			frameDiv.id = "dayline-n" + this.dN + "-frame-n" + frameIndex;
-			frameDiv.style.position = "absolute";
-			frameDiv.style.zIndex = 1000 - (2 * frameIndex);
-			frameDiv.style.backgroundColor = "lightblue";
-			frameDiv.style.textAlign = "center";
-			frameDiv.style.height = "10%"; //Fix below if you change this
-			frameDiv.style.margin = "0";
-			frameDiv.style.fontSize = "2vh";
-			frameDiv.style.border = "1px solid black";
-			frameDiv.style.flexFlow = "column nowrap";
-			frameDiv.style.justifyContent = "center";
-			frameDiv.style.alignItems = "center";
-			frameDiv.style.top = 10 * (frameIndex + 1) + "%"; //Fix below if you change this
-			//Below:  the "width" value is saved directly to the element itself, as well as in its style
-			frameDiv.width = (this.getResolution() * 4 * (newFrame.trueEndHours - newFrame.trueStartHours)) + (this.getResolution() * (newFrame.endMinutes - newFrame.startMinutes) / 15);
-			frameDiv.style.width = frameDiv.width + "px";
-			//Below: the "left" value is saved directly to the element itself, as well as in its style
-			frameDiv.left = this.getResolution() * (newFrame.trueStartHours * 4) + this.getResolution() * (newFrame.startMinutes / 15) + this.getResolution() * ((newFrame.startMeridian === "PM") ? (12) : (0));
-			frameDiv.style.left =  frameDiv.left + "px";
-			frameDiv.style.display = (display ? "flex" : "none"); //Only show this div if it was set to be displayed
-			//---Creating popup on click
-			var framepopDiv = document.createElement("div"); //This div floats under selected frames and displays more information about them. Revealed on clicking frame divs
-			framepopDiv.classList.add("dayline-framepop");
-			framepopDiv.id = frameDiv.id + "-framepop";
-			framepopDiv.style.display = "flex";
-			framepopDiv.style.visibility = "hidden";
-			framepopDiv.style.flexFlow = "row nowrap";
-			framepopDiv.style.justifyContent = "space-around";
-			framepopDiv.style.alignItems = "center";
-			framepopDiv.style.position = "absolute";
-			framepopDiv.style.zIndex = (frameDiv.style.zIndex - 1);
-			framepopDiv.style.backgroundColor = "lightgreen";
-			framepopDiv.style.border = "1px solid black";
-			framepopDiv.dataset.initialTop = Number(10 * (frameIndex + 1));
-			framepopDiv.style.top = framepopDiv.dataset.initialTop + "%"; //Initially same top
-			framepopDiv.style.left = frameDiv.style.left; //Always the same left value
-			framepopDiv.style.width = frameDiv.style.width; //Set width as the same as it's frame div
-			framepopDiv.dataset.initialHeight = Number(10); //BASED ON ABOVE
-			framepopDiv.style.height = framepopDiv.dataset.initialHeight + "%"; //Same width as the it's frame div
-			framepopDiv.style.transition = "height 0.25s, top 0.25s"; //Causes reveal/hide to be animated
-			frameDiv.addEventListener("click", function(e)
-			{
-				var popup = document.getElementById(this.id + "-framepop");
-				//console.log(popup.style.top);
-				//console.log(Number(popup.dataset.initialTop) + Number(popup.dataset.initialHeight) + "%");
-				var visibilitySet = false; //set to true to prevent double-setting
-				if (popup.style.visibility === "hidden")
-				{
-					popup.style.visibility = "visible";
-					visibilitySet = true;
-				}
-				if (popup.style.top === (popup.dataset.initialTop + "%")) //If the top-position is in it's initial value
-				{
-					popup.style.top = (Number(popup.dataset.initialTop) + Number(popup.dataset.initialHeight)) + "%"; //Set it to the drop-down value
-				}
-				else if (popup.style.top === (Number(popup.dataset.initialTop) + Number(popup.dataset.initialHeight)) + "%") //If it's already dropped-down
-				{
-					popup.style.top = (popup.dataset.initialTop + "%") //Set it to initial
-				}
-				if (popup.style.height === (popup.dataset.initialHeight + "%")) //If the height-position is in it's initial value
-				{
-					popup.style.height = "30%"; //Set it to expanded value
-				}
-				else if (popup.style.height === "30%") //If it is expanded
-				{
-					popup.style.height = (popup.dataset.initialHeight + "%"); //Then shrink it
-				}
-				if (popup.style.visibility === "visible" && visibilitySet == false)
-				{
-					setTimeout(function() {popup.style.visibility = "hidden";}, 200)
-				}
-				var iFE = //Create inspectFrame event data
-				{
-					"dN": this.dN, //The Dayline ID the clicked frame belongs to
-					"div": this, //The clicked frame
-					"popupDiv": popup //The popup frame that will show up when this frame is inspected
-				};
-				document.getElementById("dayline-n" + this.dN).dayline.triggerEvent("inspectFrame", iFE);
 			});
-			//---Section for Adding Popup subelements
-			var eventNameDiv = document.createElement("div"); //Contains the name of the event
-			var eventDescDiv = document.createElement("div"); //Contains the description of the event
-			var startTimeDiv = document.createElement("div"); //Contains the start time of the event
-			var endTimeDiv = document.createElement("div"); //Contains the end time of the div
-			eventNameDiv.innerHTML = "<b>" + newFrame.title + "</b>"; //Bolded title
-			eventDescDiv.innerText = newFrame.desc;
-			startTimeDiv.innerHTML = "<b>Start Time: </b>" + newFrame.startHours + ":" + (newFrame.startMinutes == 0 ? "00" : newFrame.startMinutes) + newFrame.startMeridian;
-			endTimeDiv.innerHTML = "<b>End Time: </b>" + newFrame.endHours + ":" + (newFrame.endMinutes == 0 ? "00" : newFrame.endMinutes) + newFrame.endMeridian;
-			eventNameDiv.style.textDecoration = "underline";
-			framepopDiv.appendChild(eventNameDiv);
-			framepopDiv.appendChild(eventDescDiv);
-			framepopDiv.appendChild(startTimeDiv);
-			framepopDiv.appendChild(endTimeDiv);
-			//---Add main elements to the document
-			var targetTimeline = document.getElementById("dayline-n" + this.dN + "-timeline");
-			targetTimeline.appendChild(frameDiv); //Add this div as a child
-			targetTimeline.appendChild(framepopDiv);
-			var aFE = //Create addFrame event data
+			display.appendChild(timelineDisplay);
+			//== selectorDisplay config ==
+			selectorDisplay = document.createElement("div");
+			selectorDisplay.id = display.id + "-selector";
+			selectorDisplay.classList.add("dayline-selector");
+			timelineDisplay.appendChild(selectorDisplay);
+			for (var j = 0; j < Math.trunc(1440 / minuteSegment); j++)     //One timebar/timelabel for each segment (1440 = total daily minutes. 1440 / minuteSegement = number of segments in a day)
 			{
-				"dN": this.dN, //ID-number of the dayline this frame was added to
-				"initDisplay": display, //True if the event was added with display = true
-				"div": frameDiv, //HTML div object representing this frame
-				"frame": newFrame //Frame data
+				//== timelabel configs ==
+				var tempTimelabelDisplay = document.createElement("div");
+				tempTimelabelDisplay.id = display.id + "-timelabel-n" + j;
+				tempTimelabelDisplay.classList.add("dayline-timelabel");
+				timelineDisplay.appendChild(tempTimelabelDisplay);
+				timelabelDisplays.push(tempTimelabelDisplay);
+				//== timebar configs ==
+				var tempTimebarDisplay = document.createElement("div");
+				tempTimebarDisplay.id = display.id + "-timebar-n" + j;
+				tempTimebarDisplay.classList.add("dayline-timebar");
+				timelineDisplay.appendChild(tempTimebarDisplay);
+				timebarDisplays.push(tempTimebarDisplay);
 			}
-			this.triggerEvent("addFrame", aFE); //Fire off event
-			return true;
+			//== dFrames configs ==
+			//None. dFrames are redrawn completely on each update. See updateDisplay()
 		}
 		else
 		{
-			//Do nothing. the frame is rejected from being added to the timeline display
-			var fCE = //Create frameConflict event data
-			{
-				"dN": this.dN, //ID-number of the dayline this frame as added to
-				"initDisplay": display, //True if the event was to be displayed by default
-				"rejectedFrame": newFrame, //Frame that was rejecteds
-				"conflictFrame": frames[conflictFrameIndex] //Frame that already existed in the time where this one wanted to exist
-			}
-			this.triggerEvent("frameConflict", fCE);
-			return false;
+			
+		}
+		updateDisplay();
+		return display;
+	}
+	
+	//---  ---
+	this.addFrame = function(startInput, endInput, constructorTitle, constructorDescription)
+	{
+		var nDFrame = new Dayline.DFrame(startInput, endInput, constructorTitle, constructorDescription);
+		dFrames.push(nDFrame);
+		updateDisplay();
+	}
+	
+	//--- Sets the selector position, in minutes past midnight ---
+	this.setSelectorTime = function(input)
+	{
+		var tempSelectorTimeObj = new Dayline.DTime(input);
+		selectorTime = tempSelectorTimeObj.getTotalMinutes();
+		updateDisplay();
+	}
+	
+	//--- Returns the selector position, in a dTime object ---
+	this.getSelectorTime = function()
+	{
+		return new Dayline.DTime(selectorTime);
+	}
+	
+	//--- Add a function to execute when the eventTypeStr event happens. Will throw an error if an invalid event is specified ---
+	this.addEventListener = function(eventTypeStr, functionInput)
+	{
+		eventListeners[eventTypeStr].push(functionInput); //All javascript objects are also associative arrays
+	}
+	
+	//--- Execute the specified event ---
+	var triggerEvent = function(eventTypeStr, eventData)
+	{
+		for (var u = 0; u < eventListeners[eventTypeStr].length; u++) //For each stored function of the type
+		{
+			eventListeners[eventTypeStr][u](eventData);               //Execute it with the passed data
 		}
 	}
 	
-	/*
-	 * Returns an HTML DOM Object representing the main visual body of the dayline system
-	 */
-	this.getDisplay = function()
-	{
-		//---Create main div element for the dayline
-		var mainDiv = document.createElement("div"); //Create an HTML DIV object that serves as the main element for the whole display
-		mainDiv.dayline = this; //Important!: The dayline element on the page has it's associated dayline as a js property to allow access.
-		this.dN = this.increaseInstance(); //dN = dayline number. Shared amoung all subelements. Numeric part of the unique dayline ID.
-		mainDiv.dN = this.dN; //dayline number shared to subelements
-		mainDiv.id = "dayline-n" + this.dN //Assign an id to the dayline gui
-		mainDiv.classList.add("dayline-main"); //Create a class to allow css hooking
-		mainDiv.style.width = "100%";
-		mainDiv.style.height = "100%";
-		//---Creating the timeline display
-		var timelineDiv = document.createElement("div"); //Create the timeline div. This div is draggable and and displays all the frame data
-		mainDiv.appendChild(timelineDiv); //Set the timeline as a child of the main div
-		timelineDiv.classList.add("dayline-timeline"); //Create a class to allow css hooking
-		timelineDiv.id = mainDiv.id + "-timeline"; //Unique ID for this timeline
-		timelineDiv.dN = this.dN; //dayline number shared to subelements
-		timelineDiv.style.height = "100%"; //Timeline div is contained to fit height-wise in the main div
-		timelineDiv.style.position = "relative"; //Allows absolute positioning of subelements
-		timelineDiv.style.overflow = "auto"; //Creates scrollbar when needed
-		timelineDiv.onclick = function(e) //Triggered when you click on the timeline
-		{
-			if (e.target == this) //If the user click exclusively on the timeline background and not any inner elements
-			{
-				//---Remove old selector element
-				var oldStartSelectorDiv = document.getElementById(this.id + "-selector-start")
-				if (document.contains(oldStartSelectorDiv)) {oldStartSelectorDiv.remove();} //Test for old selector existence. If it exists, remove it
-				//---Create and display selector element
-				var startSelectorDiv = document.createElement("div");
-				this.appendChild(startSelectorDiv);
-				startSelectorDiv.dN = this.dN; //Dayline number shared to subelements
-				startSelectorDiv.classList.add("dayline-selector-start")
-				startSelectorDiv.classList.add("dayline-selector")
-				startSelectorDiv.id = this.id + "-selector-start";
-				startSelectorDiv.style.height = "90%";
-				startSelectorDiv.style.margin = "0";
-				startSelectorDiv.style.width = "0";
-				startSelectorDiv.style.borderLeft = "2px dashed red";
-				startSelectorDiv.style.position = "absolute";
-				startSelectorDiv.style.zIndex = 10000;
-				startSelectorDiv.style.top = "10%";
-				var relativeX = ((e.clientX  + this.scrollLeft) - this.getBoundingClientRect().left); //How far, in pixels, the element is from the left side of the timeline
-				//console.log("relativeX: " + relativeX);
-				//console.log("e.clientX: " + e.clientX);
-				//console.log("getBoundingClientRect().left: " + this.getBoundingClientRect().left);
-				//console.log("scrollLeft: " + this.scrollLeft)
-				var frameList = document.getElementsByClassName("dayline-frame"); //List of all frames in the timeline
-				var smallestDiff = 10; 
-				//Above: If a click occurs within a distance less than the smallestDiff of a frame start or end, then the cursor will snap to that start or end value
-				var smallestDiffIndex = null; //This is the index of the frame who had an endpoint closest to where the cursor clicked
-				var wasEndpoint = false; //Specifies whether the closest frame was closest at the start or end points
-				for (var j = 0; j < frameList.length; j++) //For each frame
-				{
-					var startDiff = Math.abs(frameList[j].left - relativeX); //Distance from the start of this frame
-					var endDiff =  Math.abs((frameList[j].left + frameList[j].width) - relativeX); //Distance from the end of this frame
-					if (startDiff < smallestDiff) //If the start diff is less than the previous record
-					{
-						smallestDiff = startDiff; //This is the new record
-						smallestDiffIndex = j; //This is the associated frame
-						wasEndpoint = false; //Snap to this associated frame's start point
-					}
-					if (endDiff < smallestDiff) //If the end diff is less than the previous record (including this frame's own start point)
-					{
-						smallestDiff = endDiff; //This is the new record
-						smallestDiffIndex = j; //This is the associated frame
-						wasEndpoint = true; //Snap to this associated frame's end point
-					}
-				}
-				if (smallestDiffIndex != null) //If some sort of snap-operation happened
-				{
-					if (wasEndpoint == true)
-					{
-						relativeX = frameList[smallestDiffIndex].left + frameList[smallestDiffIndex].width; //The new left-side displacement becomes equal to the frame end
-					}
-					else
-					{
-						relativeX = frameList[smallestDiffIndex].left; //The new left-side displacement becomes equal to the frame start
-					}
-				}
-				startSelectorDiv.style.left =  relativeX + "px"; //Change the selector's position to where it was clicked
-				var minutesSinceMidnight = (relativeX / document.getElementById("dayline-n" + this.dN).dayline.getResolution()) * 15;
-				var timeObj = extractTime(minutesSinceMidnight); //Converts the minutes since midnight into a clock time
-				var sCE = //Prepare to fire off selector change event by preparing data to pass
-				{
-					"selector": startSelectorDiv,                  //Selector element itself
-					"timeObj": timeObj,                            //
-					"selectorType": "start",                       //Type of selector
-					"mouseX": e.clientX,                           //X-Position of mouse at time of firing
-					"scrollX": this.scrollLeft,                    //How far the timeline has scrolled
-					"visibleX": this.getBoundingClientRect().left, //The visible left-side of the timeline's x-position
-				};
-				document.getElementById("dayline-n" + this.dN).dayline.triggerEvent("selectorChange", sCE);
-			}
-		}
-		/*
-		timelineDiv.oncontextmenu= function(e) //Triggered when you right-click on the timeline
-		{
-			if (e.target == this) //If the user click exclusively on the timeline background and not any inner elements
-			{
-				e.preventDefault();
-				//---Remove old selector element
-				var oldEndSelectorDiv = document.getElementById(this.id + "-selector-end")
-				if (document.contains(oldEndSelectorDiv)) {oldEndSelectorDiv.remove();} //Test for old selector existence. If it exists, remove it
-				//---Create and display selector element
-				var endSelectorDiv = document.createElement("div");
-				this.appendChild(endSelectorDiv);
-				endSelectorDiv.dN = this.dN; //Dayline number shared to subelements
-				endSelectorDiv.classList.add("dayline-selector-end")
-				endSelectorDiv.classList.add("dayline-selector")
-				endSelectorDiv.id = this.id + "-selector-end";
-				endSelectorDiv.style.height = "90%";
-				endSelectorDiv.style.margin = "0";
-				endSelectorDiv.style.width = "0";
-				endSelectorDiv.style.borderLeft = "2px dashed blue";
-				endSelectorDiv.style.position = "absolute";
-				endSelectorDiv.style.zIndex = 10000;
-				endSelectorDiv.style.top = "10%";
-				var relativeX = ((e.clientX  + this.scrollLeft) - this.offsetLeft); //How far, in pixels, the element is from the left side of the timeline
-				//console.log("relativeX: " + relativeX);
-				//console.log("e.clientX: " + e.clientX);
-				//console.log("offsetLeft: " + this.offsetLeft);
-				//console.log("scrollLeft: " + this.scrollLeft)
-				var frameList = document.getElementsByClassName("dayline-frame"); //List of all frames in the timeline
-				var smallestDiff = 10; 
-				//Above: If a click occurs within a distance less than the smallestDiff of a frame start or end, then the cursor will snap to that start or end value
-				var smallestDiffIndex = null; //This is the index of the frame who had an endpoint closest to where the cursor clicked
-				var wasEndpoint = false; //Specifies whether the closest frame was closest at the start or end points
-				for (var j = 0; j < frameList.length; j++) //For each frame
-				{
-					var startDiff = Math.abs(frameList[j].left - relativeX); //Distance from the start of this frame
-					var endDiff =  Math.abs((frameList[j].left + frameList[j].width) - relativeX); //Distance from the end of this frame
-					if (startDiff < smallestDiff) //If the start diff is less than the previous record
-					{
-						smallestDiff = startDiff; //This is the new record
-						smallestDiffIndex = j; //This is the associated frame
-						wasEndpoint = false; //Snap to this associated frame's start point
-					}
-					if (endDiff < smallestDiff) //If the end diff is less than the previous record (including this frame's own start point)
-					{
-						smallestDiff = endDiff; //This is the new record
-						smallestDiffIndex = j; //This is the associated frame
-						wasEndpoint = true; //Snap to this associated frame's end point
-					}
-				}
-				if (smallestDiffIndex != null) //If some sort of snap-operation happened
-				{
-					if (wasEndpoint == true)
-					{
-						relativeX = frameList[smallestDiffIndex].left + frameList[smallestDiffIndex].width; //The new left-side displacement becomes equal to the frame end
-					}
-					else
-					{
-						relativeX = frameList[smallestDiffIndex].left; //The new left-side displacement becomes equal to the frame start
-					}
-				}
-				endSelectorDiv.style.left =  relativeX + "px";
-			}
-		}
-		*/
-		var meridiem = "AM"; //Indicates which side of the 12 hour clock the label is on
-		for (var k = 0; k <= 12; k += 12) //Forces the inner loops to execute twice, once with k=0 and once with k=12. Divides the clock into AM and PM
-		{
-			if (k == 12) {meridiem = "PM";} //Second loop is PM labels
-			for (var i = 0; i < 12; i++)
-			{
-				for (var j = 0; j < divisions; j++)
-				{
-					var divisionLength = 60 / divisions; //The number of minutes each division lasts
-					var timelabelDiv = document.createElement("div"); //Time-label div element. Displays at top of timeline to indicate time
-					var timebarDiv = document.createElement("div"); //Small line that creates a grid-system on timeline
-					timebarDiv.classList.add("dayline-timebar")
-					timelabelDiv.classList.add("dayline-timelabel");
-					timeIndex = (k * divisions) + (i * divisions) + j; //A count of how many timebars/timelabels have come before
-					timebarDiv.id = "dayline-n" + this.dN + "-timebar-n" + timeIndex;
-					timelabelDiv.id = "dayline-n" + this.dN + "-timelabel-n" + timeIndex; //Unique numberic id for each label
-					timebarDiv.dN = this.dN; //Shared from dayline object
-					timelabelDiv.dN = this.dM; //Shared from dayline object
-					timelabelDiv.style.left = (timeIndex * this.getResolution()) + "px";
-					timebarDiv.style.left = (timeIndex * this.getResolution()) + "px";
-					timelabelDiv.style.height = "10%";
-					timebarDiv.style.height = "100%";
-					timelabelDiv.style.margin = "0";
-					timebarDiv.style.margin = "0";
-					timelabelDiv.style.width = this.getResolution() + "px";
-					timebarDiv.style.width = "0";
-					timelabelDiv.style.fontSize = "3vh";
-					timelabelDiv.style.position = "absolute";
-					timebarDiv.style.position = "absolute";
-					timelabelDiv.style.display = "flex";
-					timelabelDiv.style.flexFlow = "row nowrap";
-					timelabelDiv.style.justifyContent = "flex-start";
-					timelabelDiv.style.alignItems = "center";
-					timebarDiv.style.display = "block";
-					timelabelDiv.style.backgroundColor = "gray";
-					timebarDiv.style.borderLeft = "1px dashed black";
-					if (i == 0) //k=0 means that the hour is 12, not 0
-					{
-						timelabelDiv.innerHTML = "12"; //Ignore math, make it 12
-					}
-					else //If not a 0-hour label
-					{
-						timelabelDiv.innerHTML = i; //Calculate the hour
-					}
-					if (j == 0) //0-minutes display as 12:00 not 12:0
-					{
-						timelabelDiv.innerHTML = timelabelDiv.innerHTML + ":00" + meridiem; //Displayed text of the time label
-					}
-					else //If not a 0-minute label
-					{
-						timelabelDiv.innerHTML = timelabelDiv.innerHTML + ":" + (divisionLength * j) + meridiem; //Displayed text of the time label
-					}
-					timelineDiv.appendChild(timelabelDiv); //Add this element to the timeline
-					timelineDiv.appendChild(timebarDiv); //Add this element to the timeline
-				}
-			}
-		}
-		return mainDiv;
-	}
-	
-	/*
-	 * Slides the dayline to the specified time
-	 */
-	this.traverseToTime = function(timeStr)
-	{
-		
-	}
+	//-----------------------CONSTRUCTOR CODE-----------------------
+	identifier = this.increaseInstance();
+	allowConflicts = allowConflictsInput;
+	//Below: initializing the arrays that contain all the listening functions
+	eventListeners.addFrame = [];
+	eventListeners.removeFrame = [];
+	eventListeners.hideFrame = [];
+	eventListeners.showFrame = [];
+	eventListeners.inspectFrame = [];
+	eventListeners.frameChange = [];
+	eventListeners.frameConflict = [];
+	eventListeners.selectorChange = [];
+	eventListeners.timelineClick = [];
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /*
- * Given a date, minutes since midnight, or timeString, pulls out the hour, minute, and meridian for a normalized clock and returns them as an obj like so
- * obj =
- * {
- *     "hours": 0-12,
- *     "minutes": 0-59,
- *     "meridian": "AM" or "PM",
- *     "trueHours": 0-24;
- *     "time": "12:00AM"
- * }
+ * 
+ * 
+ * ====================== SUBCLASSES ========================
+ * 
+ * 
  */
-function extractTime(input)
+
+
+
+
+Dayline.DTime = function(constructorInput)
 {
-	//console.log("extractTime input: " + input);
-	var obj = //Returned time object. Gets filled in by following code
+	//-----------------------PRIVATE CONSTANTS AND PROPERTIES-----------------------
+	var minutes = 0;                    //Minute value
+	var hours = 0;                      //12-hour clock hour-value
+	var trueHours = 0;                  //24-hour clock hour-value
+	var meridian = "";                  //AM or PM
+	var loopStop = false;               //Used to prevent infinite loop calls when uodating values
+	
+	//-----------------------PUBLIC FUNCTIONS-----------------------
+	//--- Sets minutes, hours, trueHours, and meridian values in one fell swoop, with special inputs. Takes Dates, strings, numbers, and other dTimes ---
+	this.setTime = function(input)
 	{
-		"hours": 0,
-		"minutes": 0,
-		"meridian": "AM",
-		"trueHours": 0,
-		"getTime": function()
+		switch(typeof input)
 		{
-			return this.hours + ":" + (this.minutes == 0 ? "00" : this.minutes) + this.meridian;
+			case "date":
+				hours = input.getHours();                                       //Direct assignment, later modified
+				minutes = input.getMinutes();                                   //Direct assignment
+				trueHours = input.getHours();                                   //Date hours are 24 hour by default
+				if (hours >= 12)                                                //Conversion from 24 to 12 hour clock
+				{
+					hours -= 12;                                                //13 becomes 1PM. 12 becomes 0PM
+					meridian = "PM";                                            //
+				}
+				else
+				{
+					meridian = "AM";                                            //
+				}
+				if (hours == 0)                                                 //If the hours are 0, they're actually 12
+				{
+					hours = 12;
+				}
+			break;
+			case "string":
+				if (input.includes("AM") || input.includes("PM"))               //If the input string is for 12-hour clocks
+				{
+					//Explained via example. Let input = "12:00AM"
+					var hoursStr = input.split(":")[0];                         //12
+					var minutesStr = input.split(":")[1].slice(0, 2);           //0
+					var meridianStr = input.split(":")[1].slice(2, 5);          //"AM"
+					this.setMinutes(Number(minutesStr));                        //Uses inbuilt scrubbing to assign
+					this.setMeridian(meridianStr);                              //Uses inbuilt scrubbing to assign
+					this.setHours(Number(hoursStr));                            //Uses inbuilt scrubbing to assign. Must be called after setMeridian
+				}
+				else
+				{
+					//Explained via example. Let input = "23:00"
+					var trueHoursStr = input.split(":")[0];                     //23
+					var minutesStr = input.split(":")[1].slice(0, 2);           //0
+					this.setMinutes(Number(minutesStr));                        //Uses inbuilt scrubbing to assign
+					this.setTrueHours(Number(trueHoursStr));                    //Uses inbuilt scrubbing to assign
+					//Meridian assigned automatically
+				}
+			break;
+			case "number":
+				this.setTotalMinutes(Number(input))
+			break;
+			case "object":
+				if (input instanceof this)
+				{
+					this.assign({}, input);                                     //Assigns this object to be a new copy of that one
+				}
+			break;
 		}
 	}
-	switch (typeof input)
+	
+	//--- Returns a nicely formatted 12-hour time string like 12:00PM for 12-hour clocks ---
+	this.getTime = function()
 	{
-		case "string":
-			//Explained via example. Let start = "12:00AM", and end = "11:35PM"
-			obj.hours = Number(input.split(":")[0]); //12
-			obj.minutes = Number(input.split(":")[1].slice(0, 2)); //0
-			obj.meridian = input.split(":")[1].slice(2, 5); //"AM"
-			obj.trueHours = obj.hours + ((obj.meridian === "PM") ? (12) : (0));
-			if (obj.hours == 12 && obj.meridian === "AM") {obj.trueHours = 0;} //Special case for 12:XXAM
-			if (obj.hours > 12) {obj.hours = 12;} //Hour capping
-			if (obj.minutes > 59) {obj.minutes = 59;} //Minute capping
-			if (obj.hours < 0) {obj.hours = 0;} //Hour minimizing
-			if (obj.minutes < 0) {obj.minutes = 0;} //Minute minimizing
-		break;
-		case "number":
-			obj.minutes = Math.trunc(input % 60);
-			obj.hours = Math.trunc(input / 60);
-			obj.meridian = (obj.hours < 12) ? "AM" : "PM";
-			obj.hours += (obj.hours > 12) ? -12 : 0; //Subtract 12 hours if at 13 -> 24
-			obj.hours = (obj.hours == 0 && obj.meridian === "AM") ? 12 : obj.hours; //0AM => 12AM
-		break;
-		case "date":
-			obj.hours = start.getHours(); //Direct assignment, later modified
-			obj.minutes = start.getMinutes(); //Direct assignment
-			obj.trueHours = obj.hours;
-			if (obj.hours > 12) //Conversion from 24 to 12 hour clock
+		return hours + ":" + (minutes == 0 ? "00" : minutes) + meridian;
+	}
+	
+	//--- Returns a nicely formatted 12-hour time string like 12:00PM for 24-hour clocks ---
+	this.getTrueTime = function()
+	{
+		return trueHours + ":" + (minutes == 0 ? "00" : minutes);
+	}
+	
+	//--- Sets the minute value to a number between 0-59 ---
+	this.setMinutes = function(minuteNumber)
+	{
+		if (minuteNumber > 59) {minuteNumber = 59;}            //Maximum constraint
+		if (minuteNumber < 0) {minuteNumber = 0;}              //Minimum constraint
+		minutes = minuteNumber;
+	}
+	
+	//--- Returns the minute value (number) ---
+	this.getMinutes = function()
+	{
+		return minutes;
+	}
+	
+	//--- Sets the total minutes since midnight value to a number between 1440 ---
+	this.setTotalMinutes = function(totalMinuteNumber)
+	{
+		if (totalMinuteNumber > (24 * 60))                              //If the input exceeds the maximum number of minutes in a day
+		{
+			totalMinuteNumber = (24 * 60);                              //Cap at the maximum minutes in a day
+		}
+		else if (totalMinuteNumber < 0)                                 //Minimal cap
+		{
+			totalMinuteNumber = 0;                                      //
+		}
+		var initialMinutes = Math.trunc(totalMinuteNumber % 60);        //Minute value is assigned to the reminder of the hour division. Truncated to create integer
+		var initialTrueHours = Math.trunc(totalMinuteNumber / 60);      //TrueHour value is the number of 60-minute segments passed. Trucated to create integers
+		this.setTrueHours(initialTrueHours);                            //Uses inbuilt scrubbing to assign
+		this.setMinutes(initialMinutes);
+		var initialMeridian = (trueHours < 12) ? "AM" : "PM";           //If there are less than 12 trueHours, then it is an AM time. Reminder: 12 hours = PM, since noon is 12PM
+		this.setMeridian(initialMeridian);                              //Uses inbuilt scrubbing to assign
+	}
+	
+	//--- Returns the total minutes since midnight value (number) ---
+	this.getTotalMinutes = function()
+	{
+		return ((this.getTrueHours() * 60) + this.getMinutes());
+	}
+	
+	//--- Sets the 12-hour clock hour value to a number (between 1-12) irrespective of meridian ---
+	this.setHours = function(hourNumber)
+	{
+		if (hourNumber > 12) {hourNumber = 12;}   //Maximum constraint
+		if (hourNumber <= 0) {hourNumber = 12;}   //Minimum constraint
+		hours = hourNumber;                       //Assignment
+		//Update trueHours to reflect hours
+		if (meridian == "AM")                     //
+		{
+			trueHours = hourNumber;               //In AM, trueHours and hours match
+			if (trueHours == 12) {trueHours = 0}; //Except for midnight, which is 12:00AM or 00:00 true
+		}
+		else
+		{
+			console.log("meridian is pm");
+			if (hourNumber == 12)                 //In the PM, trueHours are 12 hours after
 			{
-				obj.hours -= 12;
-				this.startMeridian = "PM";
+				trueHours = 12;                   //Except for noon, which is 12:00PM and 12:00
 			}
 			else
 			{
-				this.startMeridian = "AM";
-			}
-		break;
+				trueHours = hourNumber + 12;      //e.g. 1:00PM -> 13:00
+			}   
+		}
+		totalMinutes = (trueHours * 60) + minutes;
 	}
-	return obj;
+	
+	//--- Returns the 12-hour clock hours as a number ---
+	this.getHours = function()
+	{
+		return hours;
+	}
+	
+	//--- Sets the 24-hour clock value to a number between 0 and 23 ---
+	this.setTrueHours = function(trueHourNumber)
+	{
+		if (trueHourNumber > 23) {trueHourNumber = 23;}  //Maximum constraint
+		if (trueHourNumber <= 0) {trueHourNumber = 0;}   //Minimum constraint
+		trueHours = trueHourNumber;                      //Assignment
+		//Update hours to reflect trueHours
+		if (trueHourNumber >= 12)
+		{
+			meridian = "PM";                             //After noon = PM
+			hours = trueHourNumber - 12;                 //Normal hours are 12 behind
+		}
+		else
+		{
+			meridian = "AM";                             //In the morning
+			hours = trueHourNumber;                      //trueHours and hours match
+		}
+		if (hours == 0) {hours = 12;}                    //No such thing as 0 o' clock!
+		totalMinutes = (trueHours * 60) + minutes;       //
+	}
+	
+	//--- Returns the 24-hour clock hours as a number ---
+	this.getTrueHours = function()
+	{
+		return trueHours;
+	}
+	
+	//--- Sets the meridian to either "AM" or "PM" irrespective of all other values ---
+	this.setMeridian = function(meridianString)
+	{
+		meridianString.toUpperCase();  //Must be uppercase
+		if (meridianString === "PM" || meridianString === "AM")
+		{
+			meridian = meridianString;
+		}
+		else
+		{
+			throw "dTime.setMeridian: Meridians must be set to either \"PM\" or \"AM\"!: " + console.trace();
+		}
+	}
+	
+	//--- Returns either "AM" or "PM". This is not relevant for 24-hour clock values, but will be "AM" by default ---
+	this.getMeridian = function()
+	{
+		return meridian;
+	}
+	
+	//-----------------------CONSTRUCTOR CODE-----------------------
+	this.setTime(constructorInput);
 }
 
-/*
- * Constructor function for an event object.
- * Frames display on the dayline and have a duration and a set of defining properties.
- * The frame can be created by passing through two dates or two specially formatted strings
- * e.x. "12:00AM", "1:00PM", "3:54AM"
- */
-function Frame(start, end, title, desc)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Dayline.DFrame = function(startInput, endInput, constructorTitle, constructorDescription)
 {
-	this.title = title;
-	this.desc = desc;
-	this.startMeridian = "AM";
-	this.startHours = 12;
-	this.trueStartHours = 0; //24-hour clock start hours
-	this.startMinutes = 0;
-	this.startTime = ""; //Complete, final start time like "1:15AM"
-	this.endMeridian = "PM";
-	this.endHours = 12;
-	this.trueEndHours = 0; //24-hour clock end hours
-	this.endMinutes = 0;
-	this.endTime = ""; //Complete, final end time like "5:56PM"
-	if (typeof start != typeof end)
+	//-----------------------PRIVATE CONSTANTS AND PROPERTIES-----------------------
+	var start = {};              //dTime object for the start-time
+	var end = {};                //dTime object for the end-time
+	var title = "";              //
+	var description = "";        //
+	var category = "";           //String assigned at construction
+	var identifier = 0;          //Unique number for this dFrame on this webpage
+	var display = null;          //HTML element for this dFrame
+	var popDisplay = {};         //HTML element that only becomes visible when the frame becomes clicked
+	var titleDisplay = {};       //HTML element for title label
+	var descriptionDisplay = {}; //HTML element for description label
+	var startDisplay = {};       //HTML element for start-time label
+	var endDisplay = {};         //HTML element for end-time label
+	var spacing = 150;           //Pixels between 15 minute segments
+	var popState = false;        //True when a frame is displaying its inner popup
+	const fMax = 1000;           //A number that helps determine the maximum number of dFrames that can display properly on a timeline. Raising this raises the zIndex of all frames as well
+	
+	//-----------------------PRIVATE FUNCTIONS-----------------------
+	//--- Returns a unique identifier for each call ---
+	if (this.__proto__.instanceCount == null)     //If this class-wide property does not exist
 	{
-		throw "Both 'start' and 'end' parameters must either both be Dates or both Strings";
+		this.__proto__.instanceCount = 0;         //Create it. Shared by all dFrames
 	}
-	else
+	this.__proto__.increaseInstance = function()
 	{
-		var startTimeObj = extractTime(start);
-		this.startHours = startTimeObj.hours;
-		this.startMinutes = startTimeObj.minutes;
-		this.startMeridian = startTimeObj.meridian;
-		this.trueStartHours = startTimeObj.trueHours;
-		this.startTime = startTimeObj.getTime();
-		endTimeObj = extractTime(end);
-		this.endHours = endTimeObj.hours;
-		this.endMinutes = endTimeObj.minutes;
-		this.endMeridian = endTimeObj.meridian;
-		this.trueEndHours = endTimeObj.trueHours;
-		this.endTime = endTimeObj.getTime();
+		this.__proto__.instanceCount += 1;
+		return this.__proto__.instanceCount;
 	}
+	
+	var updateDisplay = function()
+	{
+		/* A Guide to Z-Index
+		 * - dFrame           : fMax - (2*identifier) - 2
+		 *    - title         : fMax - (2*identifier)
+		 *    - pop           : fMax - (2*identifier) - 1
+		 *      - description : fMax - (2*identifier) - 1
+		 *      - start       : fMax - (2*identifier) - 1
+		 *      - end         : fMax - (2*identifier) - 1
+		 */
+		if (display == null)
+		{
+			//Do nothing if the display has not been initialized
+		}
+		else
+		{
+			//== display updates ==
+			//display.style.top -> This is controlled by the Dayline, not the frame
+			display.style.left = ((start.getTotalMinutes() / 15) * spacing) + "px";
+			display.style.width = (((end.getTotalMinutes() - start.getTotalMinutes()) / 15) * spacing) + "px";
+			display.style.height = "10%";
+			display.style.position = "relative";
+			display.style.zIndex = fMax - (2 * identifier) - 2;
+			//== titleDisplay updates ==
+			titleDisplay.style.width = "100%";
+			titleDisplay.style.height = "100%";
+			titleDisplay.style.position = "absolute";
+			titleDisplay.style.zIndex = fMax - (2 * identifier) - 0;
+			titleDisplay.innerHTML = title;
+			titleDisplay.style.backgroundColor = "lightblue";
+			//== popDisplay updates ==
+			popDisplay.style.width = "100%";
+			if (popState == true)
+			{
+				popDisplay.style.display = "block";                //Shows the popup (hidden under title still)
+				setTimeout(function()                              //Slides the popup out after short delay. This delay allows css transition to work properly
+				{
+					popDisplay.style.top = "100%";
+					popDisplay.style.height = "300%";
+				}, 1);
+			}
+			else
+			{
+				popDisplay.style.top = "0";                       //Slides the popup under immediately
+				popDisplay.style.height = "100%";
+				setTimeout(function()                             //Hides the popup after a short delay. The delay allows css transition to work properly 
+				{
+					popDisplay.style.display = "none";            
+				}, 250);
+			}
+	        popDisplay.style.position = "absolute";
+			popDisplay.style.zIndex = fMax - (2 * identifier) - 1;
+			popDisplay.style.backgroundColor = "lightGreen";
+			//== descriptionDisplay updates ==
+			descriptionDisplay.innerHTML = description;
+			descriptionDisplay.style.position = "relative";
+			display.style.zIndex = fMax - (2 * identifier) - 1;
+			//== startDisplay updates ==
+			startDisplay.innerHTML = "Start: " + start.getTime();
+			startDisplay.style.position = "relative";
+			startDisplay.style.zIndex = fMax - (2 * identifier) - 1;
+			//== endDisplay updates ==
+			endDisplay.innerHTML = "End: " + end.getTime();
+			endDisplay.style.position = "relative";
+			endDisplay.style.zIndex = fMax - (2 * identifier);
+		}
+	}
+	
+	//-----------------------PUBLIC FUNCTIONS-----------------------
+	//--- Returns the HTML representation of this dFrame ---
+	this.getDisplay = function()
+	{
+		if (display == null) //Only create a display element if it doesnt exist yet
+		{
+			//== display config ==
+			display = document.createElement("div");
+			display.id = "dFrame-n" + identifier;
+			display.classList.add("dayline-dframe");
+			//== titleDisplay config ==
+			titleDisplay = document.createElement("div");
+			titleDisplay.id = display.id + "-title"
+			titleDisplay.classList.add("dayline-dframe-title");
+			titleDisplay.dFrame = this;                                //Allows the onclick function to access the methods of this class
+			titleDisplay.addEventListener("click", function()
+			{
+				this.dFrame.setPopState(!this.dFrame.getPopState());   //Toggle the popState
+			});
+			display.appendChild(titleDisplay);
+			//== popDisplay config ==
+			popDisplay = document.createElement("div");
+			popDisplay.id = display.id + "-pop";
+			popDisplay.classList.add("dayline-dframe-pop");
+			display.appendChild(popDisplay);
+			//== descriptionDisplay config ==
+			display.appendChild(titleDisplay);
+			descriptionDisplay = document.createElement("div");
+			descriptionDisplay.id = display.id + "-description"
+			descriptionDisplay.classList.add("dayline-dframe-description");
+			popDisplay.appendChild(descriptionDisplay);
+			//== startDisplay config ==
+			startDisplay = document.createElement("div");
+			startDisplay.id = display.id + "-start"
+			startDisplay.classList.add("dayline-dframe-start");
+			popDisplay.appendChild(startDisplay);
+			//== endDisplay config ==
+			endDisplay = document.createElement("div");
+			endDisplay.id = display.id + "-end"
+			endDisplay.classList.add("dayline-dframe-end");
+			popDisplay.appendChild(endDisplay);
+			//== Updates and Widths, Heights, etc via the updateDisplay() function ==
+			updateDisplay();
+			return display;
+		}
+		else
+		{
+			updateDisplay();
+			return display;
+		}
+	}
+	
+	//--- Returns the pixels between 15 minutes for this dFrame. Should match the Dayline this belongs to ---
+	this.setSpacing = function(inputSpacing)
+	{
+		spacing = inputSpacing;
+		updateDisplay();
+	}
+	
+	//--- Sets the state of the pop display ---
+	this.setPopState = function(popInput)
+	{
+		popState = popInput;
+		updateDisplay();
+	}
+	
+	//--- Returns the state of the pop display ---
+	this.getPopState = function()
+	{
+		return popState;
+	}
+	
+	//--- Takes a valid dTime constructor value, and assigns the start time to be the resulting dTime ---
+	this.setStart = function(startInput)
+	{
+		start = new Dayline.DTime(startInput);
+		updateDisplay();
+	}
+	
+	//--- Returns a copy of the dTime object that represents the start time ---
+	this.getStart = function()
+	{
+		return Object.assign({}, start); //Return a copy of the start time object
+	}
+	
+	//--- Takes a valid dTime constructor value, and assigns the end time to be the resulting dTime ---
+	this.setEnd = function(endInput)
+	{
+		end = new Dayline.DTime(endInput)
+		updateDisplay();
+	}
+	
+	//--- Returns a copy of the dTime object that represents the start time ---
+	this.getEnd = function()
+	{
+		return Object.assign({}, end); //Return a copy of the start time object
+	}
+	
+	//--- Sets the title of the event to the passed string ---
+	this.setTitle = function(titleString)
+	{
+		title = titleString;
+		updateDisplay();
+	}
+	
+	//--- Returns the title as a string. Can be HTML ---
+	this.getTitle = function()
+	{
+		return title;
+	}
+	
+	//--- Sets the description of the event as the passed string. Can be HTML ---
+	this.setDescription = function(descriptionString)
+	{
+		description = descriptionString;
+		updateDisplay();
+	}
+	
+	//--- Returns the html descript of this dFrame ---
+	this.getDescription = function()
+	{
+		return description;
+	}
+	
+	//--- Returns the unique number for this Dayline for this dFrame ---
+	this.getIdentifier = function()
+	{
+		return identifier;
+	}
+	
+	//--- Returns the category this dFrame belongs to ---
+	this.getCategory = function()
+	{
+		return category;
+	}
+	
+	//-----------------------CONSTRUCTOR CODE-----------------------
+	identifier = this.increaseInstance(); //Assigns a webpage/script-unique identifier number to this dFrame
+	this.setStart(startInput);
+	this.setEnd(endInput);
+	this.setTitle(constructorTitle);
+	this.setDescription(constructorDescription);
 }

@@ -16,9 +16,15 @@ Other Concepts:
     - `Creates a dayline.`
     - `Parameter: "allowConflicts" - determines if dFrames sharing a category and some time period are allowed to overlap`
 
-- dTime(...)
+- DTime(...)
 
-    - 	`Constructor for the dTime subclass`
+    - `Constructor for the dTime subclass`
+    - `See dTime subclass for parameters`
+    
+- DFrame(...)
+
+    - `Constructor for the dFrame subclass`
+    - `See dFrame subclass for parameters`
     
 - getDisplay()
 
