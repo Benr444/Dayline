@@ -244,9 +244,9 @@ Dayline.DTime = function(constructorInput)
 {
 	//-----------------------PRIVATE CONSTANTS AND PROPERTIES-----------------------
 	var minutes = 0;                    //Minute value
-	var hours = 0;                      //12-hour clock hour-value
+	var hours = 12;                     //12-hour clock hour-value
 	var trueHours = 0;                  //24-hour clock hour-value
-	var meridian = "";                  //AM or PM
+	var meridian = "AM";                //AM or PM
 	var loopStop = false;               //Used to prevent infinite loop calls when uodating values
 	
 	//-----------------------PUBLIC FUNCTIONS-----------------------
@@ -298,10 +298,17 @@ Dayline.DTime = function(constructorInput)
 				this.setTotalMinutes(Number(input))
 			break;
 			case "object":
-				if (input instanceof this)
+				if (input.__proto__ === this.__proto__)
 				{
-					this.assign({}, input);                                     //Assigns this object to be a new copy of that one
+					this.setTime(input.getTime());                             //Copies the time value to the new object
 				}
+				else
+				{
+					throw "dTime.setTime: If you pass an object to setTime, it must be a dTime object!: " + console.trace();
+				}
+			break;
+			case "undefined":                                                   //No input assigned
+				this.setTime(0);                                                //Set to midnight by default
 			break;
 		}
 	}
@@ -371,7 +378,6 @@ Dayline.DTime = function(constructorInput)
 		}
 		else
 		{
-			console.log("meridian is pm");
 			if (hourNumber == 12)                 //In the PM, trueHours are 12 hours after
 			{
 				trueHours = 12;                   //Except for noon, which is 12:00PM and 12:00
@@ -619,6 +625,7 @@ Dayline.DFrame = function(startInput, endInput, constructorTitle, constructorDes
 			popDisplay = document.createElement("div");
 			popDisplay.id = display.id + "-pop";
 			popDisplay.classList.add("dayline-dframe-pop");
+			popDisplay.style.display = "none";                         //Normally, display is set in the update function, but this initial value prevents the popup from appears briefly upon initialization
 			display.appendChild(popDisplay);
 			//== descriptionDisplay config ==
 			display.appendChild(titleDisplay);
