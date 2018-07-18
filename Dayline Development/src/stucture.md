@@ -55,19 +55,62 @@ Other Concepts:
     
         `1. addFrame        - dFrame added to internal register`
         
+             event = {
+                 addedEvent: the dFrame that was just added to the dFrame register
+             }
+        
         `2. removeFrame     - dFrame removed from internal register`
+        
+             event = {
+                 removedEvent: the dFrame that was just removed from the dFrame register
+             }
         
         `3. hideFrame       - dFrame removed from Timeline`
         
+             event = {
+                 hiddenFrame: dFrame that is no longer visible
+             }
+        
         `4. showFrame       - dFrame added to Timeline`
+        
+             event = {
+                 shownFrame: dFrame that is now visible
+             }
         
         `5. inspectFrame    - dFrame HTML inspected/expanded`
         
+             event = {
+                 inspectedFrame: dFrame that was inspected
+             }
+        
         `6. frameChange     - dFrame data changed`
+        
+             event = {
+                 changedFrame: dFrame that had data changed
+             }
         
         `7. frameConflict   - dFrame violates a Dayline rule`
         
+             event = {
+                 existingFrames: dFrames that previously existed and conflict
+                 newFrame: the dFrame that is attempting to be added
+             }
+        
         `8. selectorChange  - Timeline selector changes position or initialized`
+        
+             event = {
+                 oldTime: dTime that describes the selector's position before the movement
+                 newTime: dTime that describes the selector's position after the movement
+                 selector: the selector html
+             }
+        
+        `9. timelineClick   - Timeline element has been clicked. Gives click location as a time as well as relative pixel values`
+        
+             event = {
+                 time: dTime representing where on the timeline that was clicked
+                 xPos: screen-relative x-coord for the click
+                 yPos: screen-relative y-coord for the click
+             }
         
     - `The passed function is executed when the event happens (psst, this how ALL event listening schemes work)`
 
@@ -182,26 +225,26 @@ Note: dFrames can't be instantiated normally. Normally, only the main Dayline cl
 - getPopState()
     - `Returns the state of the pop info`
         
-- setStartTime(input)
+- setStart(input)
 
     - `Setting the start time will change the frame on the GUI`
     - `The input must be valid with respect to the dTime class`
     - `The frame will disapear from the Dayline if it is no longer allowed under the Dayline's rules`
     - `The object is COPIED, and cannot be used to directly edit time values for this frame`
 
-- getStartTime()
+- getStart()
 
     - `Returns a dTime object representing the starting time for this frame`
     - `The object is a COPY, and cannot be used to directly edit time values for this frame`
     
-- setEndTime(input)
+- setEnd(input)
 
     - `Setting the end time will change the dFrame on the GUI`
     - `The input must be valid with respect to the dTime class`
     - `The frame will disapear from the Dayline if it is no longer allowed under the Dayline's rules`
     - `The object is COPIED, and cannot be used to directly edit time values for this frame`
 
-- getEndTime()
+- getEnd()
 
     - `Returns a dTime object representing the ending time for this dFrame`
     - `The object is a COPY, and cannot be used to directly edit time values for this frame`

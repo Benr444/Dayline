@@ -32,7 +32,7 @@ function dTime(constructorInput)
 				}
 			break;
 			case "string":
-				if (input.includes("AM") || input.includes("AM"))               //If the input string is for 12-hour clocks
+				if (input.includes("AM") || input.includes("PM"))               //If the input string is for 12-hour clocks
 				{
 					//Explained via example. Let input = "12:00AM"
 					var hoursStr = input.split(":")[0];                         //12
@@ -122,13 +122,14 @@ function dTime(constructorInput)
 		if (hourNumber <= 0) {hourNumber = 12;}   //Minimum constraint
 		hours = hourNumber;                       //Assignment
 		//Update trueHours to reflect hours
-		if (meridian == "AM")                    //
+		if (meridian == "AM")                     //
 		{
 			trueHours = hourNumber;               //In AM, trueHours and hours match
 			if (trueHours == 12) {trueHours = 0}; //Except for midnight, which is 12:00AM or 00:00 true
 		}
 		else
 		{
+			console.log("meridian is pm");
 			if (hourNumber == 12)                 //In the PM, trueHours are 12 hours after
 			{
 				trueHours = 12;                   //Except for noon, which is 12:00PM and 12:00
@@ -196,5 +197,4 @@ function dTime(constructorInput)
 	
 	//-----------------------CONSTRUCTOR CODE-----------------------
 	this.setTime(constructorInput);
-	console.log("dTime: " + this.getTime());
 }

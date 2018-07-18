@@ -1,39 +1,43 @@
 function dFrame(startInput, endInput, constructorTitle, constructorDescription)
 {
 	//-----------------------PRIVATE CONSTANTS AND PROPERTIES-----------------------
-	var start = {};              //
-	var end = {};                //
+	var start = {};              //dTime object for the start-time
+	var end = {};                //dTime object for the end-time
 	var title = "";              //
 	var description = "";        //
-	var category = "";           //
+	var category = "";           //String assigned at construction
 	var identifier = 0;          //Unique number for this dFrame on this webpage
 	var display = null;          //HTML element for this dFrame
 	var popDisplay = {};         //HTML element that only becomes visible when the frame becomes clicked
-	var titleDisplay = {};       //
-	var descriptionDisplay = {}; //
-	var startDisplay = {};       //
-	var endDisplay = {};         //
-	var spacing = 0;             //Pixels between 15 minute segments
+	var titleDisplay = {};       //HTML element for title label
+	var descriptionDisplay = {}; //HTML element for description label
+	var startDisplay = {};       //HTML element for start-time label
+	var endDisplay = {};         //HTML element for end-time label
+	var spacing = 150;           //Pixels between 15 minute segments
 	var popState = false;        //True when a frame is displaying its inner popup
 	const fMax = 1000;           //A number that helps determine the maximum number of dFrames that can display properly on a timeline. Raising this raises the zIndex of all frames as well
 	
 	//-----------------------PRIVATE FUNCTIONS-----------------------
 	//--- Returns a unique identifier for each call ---
-	this.__proto__.increaseInstance = (function()
+	if (this.__proto__.instanceCount == null)     //If this class-wide property does not exist
 	{
-		var instanceCount = -1; //Begins at -1 so that the first instance is 0.
-		return function() {instanceCount += 1; return instanceCount;}
-	})();
+		this.__proto__.instanceCount = 0;         //Create it. Shared by all dFrames
+	}
+	this.__proto__.increaseInstance = function()
+	{
+		this.__proto__.instanceCount += 1;
+		return this.__proto__.instanceCount;
+	}
 	
 	var updateDisplay = function()
 	{
 		/* A Guide to Z-Index
-		 * - dFrame           : fMax - 1 - identifier
-		 *    - title         : fMax + 2 - identifier
-		 *    - pop           : fMax - identifier
-		 *      - description : fMax + 1 - identifier
-		 *      - start       : fMax + 1 - identifier
-		 *      - end         : fMax + 1 - identifier
+		 * - dFrame           : fMax - (2*identifier) - 2
+		 *    - title         : fMax - (2*identifier)
+		 *    - pop           : fMax - (2*identifier) - 1
+		 *      - description : fMax - (2*identifier) - 1
+		 *      - start       : fMax - (2*identifier) - 1
+		 *      - end         : fMax - (2*identifier) - 1
 		 */
 		if (display == null)
 		{
@@ -42,45 +46,54 @@ function dFrame(startInput, endInput, constructorTitle, constructorDescription)
 		else
 		{
 			//== display updates ==
-			//display.style.height -> This is controlled by the Dayline, not the frame
+			//display.style.top -> This is controlled by the Dayline, not the frame
 			display.style.left = ((start.getTotalMinutes() / 15) * spacing) + "px";
 			display.style.width = (((end.getTotalMinutes() - start.getTotalMinutes()) / 15) * spacing) + "px";
 			display.style.height = "10%";
 			display.style.position = "relative";
-			display.style.zIndex = fMax - 1 - identifier;
+			display.style.zIndex = fMax - (2 * identifier) - 2;
 			//== titleDisplay updates ==
 			titleDisplay.style.width = "100%";
 			titleDisplay.style.height = "100%";
-			titleDisplay.style.position = "relative";
-			titleDisplay.style.zIndex = fMax + 2 - identifier;
+			titleDisplay.style.position = "absolute";
+			titleDisplay.style.zIndex = fMax - (2 * identifier) - 0;
 			titleDisplay.innerHTML = title;
+			titleDisplay.style.backgroundColor = "lightblue";
 			//== popDisplay updates ==
 			popDisplay.style.width = "100%";
-			
 			if (popState == true)
 			{
-				popDisplay.style.top = "100%";
-				popDisplay.style.height = "300%";
+				popDisplay.style.display = "block";                //Shows the popup (hidden under title still)
+				setTimeout(function()                              //Slides the popup out after short delay. This delay allows css transition to work properly
+				{
+					popDisplay.style.top = "100%";
+					popDisplay.style.height = "300%";
+				}, 1);
 			}
 			else
 			{
-				popDisplay.style.top = "0";
+				popDisplay.style.top = "0";                       //Slides the popup under immediately
 				popDisplay.style.height = "100%";
+				setTimeout(function()                             //Hides the popup after a short delay. The delay allows css transition to work properly 
+				{
+					popDisplay.style.display = "none";            
+				}, 250);
 			}
-	        popDisplay.style.position = "relative";
-			popDisplay.style.zIndex = fMax - identifier;
+	        popDisplay.style.position = "absolute";
+			popDisplay.style.zIndex = fMax - (2 * identifier) - 1;
+			popDisplay.style.backgroundColor = "lightGreen";
 			//== descriptionDisplay updates ==
 			descriptionDisplay.innerHTML = description;
 			descriptionDisplay.style.position = "relative";
-			display.style.zIndex = fMax + 1 - identifier;
+			display.style.zIndex = fMax - (2 * identifier) - 1;
 			//== startDisplay updates ==
-			startDisplay.innerHTML = start.getTime();
+			startDisplay.innerHTML = "Start: " + start.getTime();
 			startDisplay.style.position = "relative";
-			startDisplay.style.zIndex = fMax + 1 - identifier;
+			startDisplay.style.zIndex = fMax - (2 * identifier) - 1;
 			//== endDisplay updates ==
-			endDisplay.innerHTML = end.getTime();
+			endDisplay.innerHTML = "End: " + end.getTime();
 			endDisplay.style.position = "relative";
-			endDisplay.style.zIndex = fMax + 1 - identifier;
+			endDisplay.style.zIndex = fMax - (2 * identifier);
 		}
 	}
 	
@@ -93,43 +106,37 @@ function dFrame(startInput, endInput, constructorTitle, constructorDescription)
 			//== display config ==
 			display = document.createElement("div");
 			display.id = "dFrame-n" + identifier;
-			display.classList.add("dayline-dFrame");
-			display.style.position = "relative";
+			display.classList.add("dayline-dframe");
 			//== titleDisplay config ==
 			titleDisplay = document.createElement("div");
 			titleDisplay.id = display.id + "-title"
-			titleDisplay.classList.add("dayline-dFrame-title");
-			titleDisplay.style.position = "relative";
+			titleDisplay.classList.add("dayline-dframe-title");
 			titleDisplay.dFrame = this;                                //Allows the onclick function to access the methods of this class
 			titleDisplay.addEventListener("click", function()
 			{
-				this.dFrame.setPopState(!this.dFrame.setPopState);     //Toggle the popState
+				this.dFrame.setPopState(!this.dFrame.getPopState());   //Toggle the popState
 			});
 			display.appendChild(titleDisplay);
 			//== popDisplay config ==
 			popDisplay = document.createElement("div");
 			popDisplay.id = display.id + "-pop";
-			popDisplay.classList.add("dayline-dFrame-pop");
-			popDisplay.style.position = "relative";
+			popDisplay.classList.add("dayline-dframe-pop");
 			display.appendChild(popDisplay);
 			//== descriptionDisplay config ==
 			display.appendChild(titleDisplay);
 			descriptionDisplay = document.createElement("div");
 			descriptionDisplay.id = display.id + "-description"
-			descriptionDisplay.classList.add("dayline-dFrame-description");
-			descriptionDisplay.style.position = "relative";
+			descriptionDisplay.classList.add("dayline-dframe-description");
 			popDisplay.appendChild(descriptionDisplay);
 			//== startDisplay config ==
 			startDisplay = document.createElement("div");
 			startDisplay.id = display.id + "-start"
-			startDisplay.classList.add("dayline-dFrame-start");
-			startDisplay.style.position = "relative";
+			startDisplay.classList.add("dayline-dframe-start");
 			popDisplay.appendChild(startDisplay);
 			//== endDisplay config ==
 			endDisplay = document.createElement("div");
 			endDisplay.id = display.id + "-end"
-			endDisplay.classList.add("dayline-dFrame-end");
-			endDisplay.style.position = "relative";
+			endDisplay.classList.add("dayline-dframe-end");
 			popDisplay.appendChild(endDisplay);
 			//== Updates and Widths, Heights, etc via the updateDisplay() function ==
 			updateDisplay();
@@ -163,27 +170,27 @@ function dFrame(startInput, endInput, constructorTitle, constructorDescription)
 	}
 	
 	//--- Takes a valid dTime constructor value, and assigns the start time to be the resulting dTime ---
-	this.setStartTime = function(startInput)
+	this.setStart = function(startInput)
 	{
 		start = new dTime(startInput);
 		updateDisplay();
 	}
 	
 	//--- Returns a copy of the dTime object that represents the start time ---
-	this.getStartTimes = function()
+	this.getStart = function()
 	{
 		return Object.assign({}, start); //Return a copy of the start time object
 	}
 	
 	//--- Takes a valid dTime constructor value, and assigns the end time to be the resulting dTime ---
-	this.setEndTime = function(endInput)
+	this.setEnd = function(endInput)
 	{
 		end = new dTime(endInput)
 		updateDisplay();
 	}
 	
 	//--- Returns a copy of the dTime object that represents the start time ---
-	this.getEndTime = function()
+	this.getEnd = function()
 	{
 		return Object.assign({}, end); //Return a copy of the start time object
 	}
@@ -227,9 +234,9 @@ function dFrame(startInput, endInput, constructorTitle, constructorDescription)
 	}
 	
 	//-----------------------CONSTRUCTOR CODE-----------------------
-	identifier = this.increaseInstance();               //Assigns a webpage/script-unique identifier number to this dFrame
-	this.setStartTime(startInput);
-	this.setEndTime(endInput);
+	identifier = this.increaseInstance(); //Assigns a webpage/script-unique identifier number to this dFrame
+	this.setStart(startInput);
+	this.setEnd(endInput);
 	this.setTitle(constructorTitle);
 	this.setDescription(constructorDescription);
 }
