@@ -247,7 +247,7 @@ Dayline.DTime = function(constructorInput)
 	var hours = 12;                     //12-hour clock hour-value
 	var trueHours = 0;                  //24-hour clock hour-value
 	var meridian = "AM";                //AM or PM
-	var loopStop = false;               //Used to prevent infinite loop calls when uodating values
+	var defaulted = false;           //Set to true if the time was poorly-defined on most recent setting. Poorly-defined times default to 12:00AM
 	
 	//-----------------------PUBLIC FUNCTIONS-----------------------
 	//--- Sets minutes, hours, trueHours, and meridian values in one fell swoop, with special inputs. Takes Dates, strings, numbers, and other dTimes ---
@@ -272,14 +272,26 @@ Dayline.DTime = function(constructorInput)
 				{
 					hours = 12;
 				}
+				defaulted = false;                                              //Valid input
 			break;
 			case "string":
 				if (input.includes("AM") || input.includes("PM"))               //If the input string is for 12-hour clocks
 				{
 					//Explained via example. Let input = "12:00AM"
 					var hoursStr = input.split(":")[0];                         //12
-					var minutesStr = input.split(":")[1].slice(0, 2);           //0
-					var meridianStr = input.split(":")[1].slice(2, 5);          //"AM"
+					var backhalf = input.split(":")[1];                         //:00AM
+					if (backhalf != undefined)
+					{
+						var minutesStr = backhalf.slice(0, 2);                  //0
+						var meridianStr = backhalf.slice(2, 5);                 //"AM"
+						defaulted = false;
+					}
+					else
+					{
+						var minutesStr = "0";
+						var meridianStr = "AM";
+						defaulted = true;
+					}
 					this.setMinutes(Number(minutesStr));                        //Uses inbuilt scrubbing to assign
 					this.setMeridian(meridianStr);                              //Uses inbuilt scrubbing to assign
 					this.setHours(Number(hoursStr));                            //Uses inbuilt scrubbing to assign. Must be called after setMeridian
@@ -288,27 +300,35 @@ Dayline.DTime = function(constructorInput)
 				{
 					//Explained via example. Let input = "23:00"
 					var trueHoursStr = input.split(":")[0];                     //23
-					var minutesStr = input.split(":")[1].slice(0, 2);           //0
+					var minutesStr = input.split(":")[1];                       //:00
+					if (minutesStr != undefined)
+					{minutesStr = minutesStr.slice(0, 2); defaulted = false;}                      //0
+					else
+					{minutesStr = "0"; defaulted = true;}
 					this.setMinutes(Number(minutesStr));                        //Uses inbuilt scrubbing to assign
 					this.setTrueHours(Number(trueHoursStr));                    //Uses inbuilt scrubbing to assign
 					//Meridian assigned automatically
 				}
 			break;
 			case "number":
-				this.setTotalMinutes(Number(input))
+				this.setTotalMinutes(Number(input));
+				defaulted = false;                                             //Valid input
 			break;
 			case "object":
 				if (input.__proto__ === this.__proto__)
 				{
 					this.setTime(input.getTime());                             //Copies the time value to the new object
+					defaulted = false;                                         //Valid input
 				}
 				else
 				{
 					throw "dTime.setTime: If you pass an object to setTime, it must be a dTime object!: " + console.trace();
+					this.setTime(0);
 				}
 			break;
 			case "undefined":                                                   //No input assigned
 				this.setTime(0);                                                //Set to midnight by default
+				defaulted = true;                                               //Considered a defaulted scenario
 			break;
 		}
 	}
@@ -441,6 +461,12 @@ Dayline.DTime = function(constructorInput)
 	this.getMeridian = function()
 	{
 		return meridian;
+	}
+	
+	//--- Return true if the most recent time setting or construction caused the time to default to 12:00AM ---
+	this.getDefaulted = function()
+	{
+		return defaulted;
 	}
 	
 	//-----------------------CONSTRUCTOR CODE-----------------------

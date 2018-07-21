@@ -200,6 +200,14 @@ Similar to a date, but specifies a time only on a 12 or 24 hour clock, down to m
 - getTrueTime()
    
     - `Returns a readable time string like "14:32" for 24h clocks`
+    
+- getDefaulted()
+
+    - `Returns true if the construction or last setTime() had a poorly-defined input`
+    - `e.g. new Dayline.DTime("bagels") -> getDefaulted() would return true until setTime("12:00AM") or another valid input was passed`
+    - `All defaulted dTimes return 12:00AM, but not all 12:00AM times are defaulted`
+    - `new DTime() with no arguments is considered defaulted`
+    - `Input-clipping is not considered defaulting. An input of "13:76AM" will become "12:59AM" but is not considered defaulted`
 
 ## Subclass: dFrame
 A frame represents an event, booking, or appointment on the Dayline.
